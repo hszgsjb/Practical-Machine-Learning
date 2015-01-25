@@ -1,0 +1,187 @@
+#R package:
+library(caret)
+library(rattle)
+library(randomForest)
+library(rpart)
+
+
+#Input data:
+trainingdata <- read.csv("pml-training.csv",na.strings=c("","NA"))
+testingdata <- read.csv("pml-testing.csv",na.strings=c("","NA"))
+column_train <- colnames(trainingdata)
+column_test <- colnames(testingdata)
+all.equal(column_train[1:length(column_train)-1], column_test[1:length(column_test)-1])
+
+#Here I input two dataset into R and view all blank data as NA as well. Then I check whether training dataset and testing dataset have the same columns.
+
+#Data Preprocessing (Cleaning)
+
+column.na.training <- apply(trainingdata, 2, function(x) any(is.na(x)))
+trainingnona <- trainingdata[,!column.na.training]
+trainingset <- trainingnona[,8:60]
+column.na.test <- apply (testingdata, 2, function(x)  any(is.na(x)))
+testingnona <- testingdata[,!column.na.test]
+testingset <- testingnona[,8:60]
+
+#Here I find out any column including at least one NA, and delete these columns for both testing dataset and training dataset. Then the rest of columns are the valid features.
+
+nsv <- nearZeroVar(trainingset, saveMetrics=TRUE)
+nsv
+
+# Output 
+                    freqRatio percentUnique zeroVar   nzv
+roll_belt             1.101904     6.7781062   FALSE FALSE
+pitch_belt            1.036082     9.3772296   FALSE FALSE
+yaw_belt              1.058480     9.9734991   FALSE FALSE
+total_accel_belt      1.063160     0.1477933   FALSE FALSE
+gyros_belt_x          1.058651     0.7134849   FALSE FALSE
+gyros_belt_y          1.144000     0.3516461   FALSE FALSE
+gyros_belt_z          1.066214     0.8612782   FALSE FALSE
+accel_belt_x          1.055412     0.8357966   FALSE FALSE
+accel_belt_y          1.113725     0.7287738   FALSE FALSE
+accel_belt_z          1.078767     1.5237998   FALSE FALSE
+magnet_belt_x         1.090141     1.6664968   FALSE FALSE
+magnet_belt_y         1.099688     1.5187035   FALSE FALSE
+magnet_belt_z         1.006369     2.3290184   FALSE FALSE
+roll_arm             52.338462    13.5256345   FALSE FALSE
+pitch_arm            87.256410    15.7323412   FALSE FALSE
+yaw_arm              33.029126    14.6570176   FALSE FALSE
+total_accel_arm       1.024526     0.3363572   FALSE FALSE
+gyros_arm_x           1.015504     3.2769341   FALSE FALSE
+gyros_arm_y           1.454369     1.9162165   FALSE FALSE
+gyros_arm_z           1.110687     1.2638875   FALSE FALSE
+accel_arm_x           1.017341     3.9598410   FALSE FALSE
+accel_arm_y           1.140187     2.7367241   FALSE FALSE
+accel_arm_z           1.128000     4.0362858   FALSE FALSE
+magnet_arm_x          1.000000     6.8239731   FALSE FALSE
+magnet_arm_y          1.056818     4.4439914   FALSE FALSE
+magnet_arm_z          1.036364     6.4468454   FALSE FALSE
+roll_dumbbell         1.022388    84.2065029   FALSE FALSE
+pitch_dumbbell        2.277372    81.7449801   FALSE FALSE
+yaw_dumbbell          1.132231    83.4828254   FALSE FALSE
+total_accel_dumbbell  1.072634     0.2191418   FALSE FALSE
+gyros_dumbbell_x      1.003268     1.2282132   FALSE FALSE
+gyros_dumbbell_y      1.264957     1.4167771   FALSE FALSE
+gyros_dumbbell_z      1.060100     1.0498420   FALSE FALSE
+accel_dumbbell_x      1.018018     2.1659362   FALSE FALSE
+accel_dumbbell_y      1.053061     2.3748853   FALSE FALSE
+accel_dumbbell_z      1.133333     2.0894914   FALSE FALSE
+magnet_dumbbell_x     1.098266     5.7486495   FALSE FALSE
+magnet_dumbbell_y     1.197740     4.3012945   FALSE FALSE
+magnet_dumbbell_z     1.020833     3.4451126   FALSE FALSE
+roll_forearm         11.589286    11.0895933   FALSE FALSE
+pitch_forearm        65.983051    14.8557741   FALSE FALSE
+yaw_forearm          15.322835    10.1467740   FALSE FALSE
+total_accel_forearm   1.128928     0.3567424   FALSE FALSE
+gyros_forearm_x       1.059273     1.5187035   FALSE FALSE
+gyros_forearm_y       1.036554     3.7763735   FALSE FALSE
+gyros_forearm_z       1.122917     1.5645704   FALSE FALSE
+accel_forearm_x       1.126437     4.0464784   FALSE FALSE
+accel_forearm_y       1.059406     5.1116094   FALSE FALSE
+accel_forearm_z       1.006250     2.9558659   FALSE FALSE
+magnet_forearm_x      1.012346     7.7667924   FALSE FALSE
+magnet_forearm_y      1.246914     9.5403119   FALSE FALSE
+magnet_forearm_z      1.000000     8.5771073   FALSE FALSE
+classe                1.469581     0.0254816   FALSE FALSE
+
+
+# All nzv are FALSE. That means no selected feature has zero variate and all have predictive power.
+
+# Data Slicing 
+#Even though we have testing dataset, we could not use them to test the predictive accuracy of our models. Therefore, we should split our training dataset into training part and testing part (cross validation). The testing part will be used to calculate out-of-sample error which measures the performance of our model.
+
+inTrain <- createDataPartition(y=trainingset$classe, p=0.75, list=FALSE)
+training <- trainingset[inTrain,]
+testing <- trainingset[-inTrain,]
+
+
+# Algorithm:
+modFitA1 <- rpart(classe ~ ., data=training, method="class")
+fancyRpartPlot(modFitA1)
+prediction <- predict(modFitA1, testing, type="class")
+confusionMatrix(prediction, testing$classe)
+
+
+# Output: Confusion Matrix and Statistics
+
+          Reference
+Prediction    A    B    C    D    E
+         A 1220  200   25   88   35
+         B   27  534   80   36   59
+         C   43  112  676  122  107
+         D   50   60   48  502   55
+         E   55   43   26   56  645
+
+Overall Statistics
+                                          
+               Accuracy : 0.7294          
+                 95% CI : (0.7167, 0.7418)
+    No Information Rate : 0.2845          
+    P-Value [Acc > NIR] : < 2.2e-16       
+                                          
+                  Kappa : 0.6564          
+ Mcnemar's Test P-Value : < 2.2e-16       
+
+Statistics by Class:
+
+                     Class: A Class: B Class: C Class: D Class: E
+Sensitivity            0.8746   0.5627   0.7906   0.6244   0.7159
+Specificity            0.9008   0.9489   0.9052   0.9480   0.9550
+Pos Pred Value         0.7781   0.7255   0.6377   0.7021   0.7818
+Neg Pred Value         0.9475   0.9004   0.9534   0.9279   0.9372
+Prevalence             0.2845   0.1935   0.1743   0.1639   0.1837
+Detection Rate         0.2488   0.1089   0.1378   0.1024   0.1315
+Detection Prevalence   0.3197   0.1501   0.2162   0.1458   0.1682
+Balanced Accuracy      0.8877   0.7558   0.8479   0.7862   0.8355
+
+
+# When we use simple bootstrap resampling  to get training set and the classic classification tree to predict, the accuracy is 72%, which is unsatisfied. Due to too many features we have, I decide to use random Forest method.
+
+
+# random Forest algorithm
+modFitB1 <- randomForest(classe ~. , data=training)
+predictionsB1 <- predict(modFitB1, testing, type = "class")
+confusionMatrix(predictionsB1, testing$classe)
+
+#Output : Confusion Matrix and Statistics
+
+          Reference
+Prediction    A    B    C    D    E
+         A 1391    3    0    0    0
+         B    3  946    4    0    0
+         C    0    0  851    8    2
+         D    0    0    0  793    2
+         E    1    0    0    3  897
+
+Overall Statistics
+                                          
+               Accuracy : 0.9947          
+                 95% CI : (0.9922, 0.9965)
+    No Information Rate : 0.2845          
+    P-Value [Acc > NIR] : < 2.2e-16       
+                                          
+                  Kappa : 0.9933          
+ Mcnemar's Test P-Value : NA              
+
+Statistics by Class:
+
+                     Class: A Class: B Class: C Class: D Class: E
+Sensitivity            0.9971   0.9968   0.9953   0.9863   0.9956
+Specificity            0.9991   0.9982   0.9975   0.9995   0.9990
+Pos Pred Value         0.9978   0.9927   0.9884   0.9975   0.9956
+Neg Pred Value         0.9989   0.9992   0.9990   0.9973   0.9990
+Prevalence             0.2845   0.1935   0.1743   0.1639   0.1837
+Detection Rate         0.2836   0.1929   0.1735   0.1617   0.1829
+Detection Prevalence   0.2843   0.1943   0.1756   0.1621   0.1837
+Balanced Accuracy      0.9981   0.9975   0.9964   0.9929   0.9973
+
+# I expect the out-of-sample error is about 5%. Here the accuracy is 99%, so the out-of-sample error is just 1%. Very good
+
+# Predict testing dataset
+prediction1 <- predict (modFitB1, testingset, type = "class")
+
+Output: 
+	prediction1
+ 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
+ B  A  B  A  A  E  D  B  A  A  B  C  B  A  E  E  A  B  B  B 
+Levels: A B C D E
